@@ -129,8 +129,8 @@ TEST("auto alloced heap alloc can not be extended, even if resize will be mmappe
 
 TEST("auto alloced mmap alloc can be extended if room") {
     static constexpr size_t SZ = MemoryAllocator::HUGEPAGE_SIZE*2;
-    Alloc reserved = Alloc::alloc(SZ);
     Alloc buf = Alloc::alloc(SZ);
+    Alloc reserved = Alloc::alloc(SZ);
 
     // Normally mmapping starts at the top and grows down in address space.
     // Then there is no room to extend the last mapping.
@@ -151,8 +151,8 @@ TEST("auto alloced mmap alloc can be extended if room") {
 
 TEST("auto alloced mmap alloc can not be extended if no room") {
     static constexpr size_t SZ = MemoryAllocator::HUGEPAGE_SIZE*2;
-    Alloc reserved = Alloc::alloc(SZ);
     Alloc buf = Alloc::alloc(SZ);
+    Alloc reserved = Alloc::alloc(SZ);
 
     // Normally mmapping starts at the top and grows down in address space.
     // Then there is no room to extend the last mapping.
@@ -167,8 +167,8 @@ TEST("auto alloced mmap alloc can not be extended if no room") {
 }
 
 TEST("mmap alloc can be extended if room") {
-    Alloc reserved = Alloc::allocMMap(100);
     Alloc buf = Alloc::allocMMap(100);
+    Alloc reserved = Alloc::allocMMap(100);
 
     // Normally mmapping starts at the top and grows down in address space.
     // Then there is no room to extend the last mapping.
@@ -188,8 +188,8 @@ TEST("mmap alloc can be extended if room") {
 }
 
 TEST("mmap alloc can not be extended if no room") {
-    Alloc reserved = Alloc::allocMMap(100);
     Alloc buf = Alloc::allocMMap(100);
+    Alloc reserved = Alloc::allocMMap(100);
 
     // Normally mmapping starts at the top and grows down in address space.
     // Then there is no room to extend the last mapping.
