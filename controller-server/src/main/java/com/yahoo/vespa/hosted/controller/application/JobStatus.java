@@ -101,6 +101,7 @@ public class JobStatus {
 
     public DeploymentJobs.JobType type() { return type; }
 
+    // TODO: This is true for jobs which have only been triggered!?
     /** Returns true unless this job last completed with a failure */
     public boolean isSuccess() { return ! jobError.isPresent(); }
     
