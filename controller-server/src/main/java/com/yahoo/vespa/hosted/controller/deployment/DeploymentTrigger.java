@@ -499,44 +499,44 @@ public class DeploymentTrigger {
      *
      * The intial state is determined by whether there are revision or version changes to roll out.
      * For each following step, as given by the deployment spec, check whether the previous state is valid,
-     * different from the state of the current step and with differences that are currently permitted;
-     * if this is all true, determine the reason for triggering the current step, if any, and trigger, if there is a reason to.
+     * different from the state of the jobs in the step and with differences that are currently permitted;
+     * if this is all true, determine the reason for triggering the current job, if any. If there is a reason
+     * to trigger, and if it is allowed to trigger that job right now, then do so.
      * Finally, if the last step succeeded with a valid state, mark the changes of this state as complete.
      */
-    private void triggerSnuff(LockedApplication application) {
+    // This method should be called both by the upgrade maintainer, and on job completion.
+    private void triggerJobsFor(LockedApplication application) {
         State state = State.inital(application);
         for (DeploymentSpec.Step step : application.deploymentSpec().steps()) {
-            // Find the jobs of this step, and trigger what should be triggered based on the state of the previous step:
+            // For the jobs of this step, trigger what should be triggered based on the state of the previous step:
             List<JobType> stepJobs = step.zones().stream().map(this::jobFor).collect(Collectors.toList());
-            Map<JobType, JobStatus> jobStatuses = application.deploymentJobs().jobStatus();
+            Map<JobType, JobStatus> jobStatus = application.deploymentJobs().jobStatus();
             for (JobType jobType : stepJobs) {
-                if (state.isSimilarTo(State.of(jobStatuses.get(jobType)))) continue; // If the two states are the same, do nothing.
+                if (state.isSimilarTo(State.of(jobStatus.get(jobType)))) continue; // If the two states are the same, do nothing.
 
                 State target = state;
                 if ( ! application.deploymentSpec().canChangeRevisionAt(clock.instant())) target = target.withoutRevision();
                 if ( ! application.deploymentSpec().canUpgradeAt(clock.instant())) target = target.withoutVersion();
                 if (target.isInvalid()) continue; // If all possible changes were prohibited, do nothing.
 
-                Optional<String> reason = reasonForTriggering(jobStatuses.get(jobType));
+                Optional<String> reason = reasonForTriggering(jobStatus.get(jobType));
                 if ( ! reason.isPresent()) continue; // If we had no reason to trigger this job now: don't!
 
                 if ( ! canTriggerNow(jobType, target, application, stepJobs)) continue; // Go somewhere else to force.
 
-                // Put determination of version and revision here, based on if they're present in target or not.
-                // What is really selected at deployment time, though?
-                buildSystem.addJob(application.id(), jobType, false);
+                buildSystem.addJob(application.id(), jobType, reason.get().equals("Retrying immediately, as the job failed on capacity constraints."));
                 application = application.withJobTriggering(jobType, application.deploying(), reason.get(), clock.instant(), controller);
 
             }
             // Finally, find the exit state of this step, to propagate further:
             state = stepJobs.stream()
-                    .map(jobType -> State.of(jobStatuses.get(jobType)))
+                    .map(jobType -> State.of(jobStatus.get(jobType)))
                     .reduce(State::merge)
                     // A bit convoluted, perhaps; if empty stepJobs, this is a Delay, and we just delay the input state.
                     .orElse(state.delay(((DeploymentSpec.Delay) step).duration(), clock.instant()));
         }
         if (state.version().isPresent()) application = application.withDeploying(Optional.empty()); // TODO: Change this, obviously.
-        applications().store(application);
+        controller.applications().store(application);
     }
 
     private JobType jobFor(DeploymentSpec.DeclaredZone zone) {
@@ -548,7 +548,7 @@ public class DeploymentTrigger {
         if (jobStatus == null) return Optional.of("Job became available for triggering for the first time.");
         if (jobStatus.isRunning(jobTimeoutLimit())) return Optional.empty();
         if (jobStatus.isSuccess()) return Optional.of("A new change passed successfully through the upstream step.");
-        // Separate treatment for out-of-capacity-failures? On that topic: make a reasons-enum to differentiate between triggering with different reasons?
+        if (jobStatus.jobError().filter(JobError.outOfCapacity::equals).isPresent()) return Optional.of("Retrying immediately, as the job failed on capacity constraints.");
         if (jobStatus.firstFailing().get().at().isAfter(clock.instant().minus(Duration.ofSeconds(10)))) return Optional.of("Immediate retry, as " + jobStatus.type() + " just started failing.");
         if (   jobStatus.lastCompleted().get().at().isBefore(clock.instant().minus(Duration.between(jobStatus.firstFailing().get().at(), clock.instant()).dividedBy(10)))
                || jobStatus.lastCompleted().get().at().isBefore(clock.instant().minus(Duration.ofHours(4)))) return Optional.of("Delayed retry, as " + jobStatus.type() + " hasn't been retried for a while.");
@@ -600,7 +600,7 @@ public class DeploymentTrigger {
 
         public static State inital(Application application) {
             // version    <-- application is upgrading ? target version : null
-            // revision   <-- application has new revision ready to go ? unknownRevision : null
+            // revision   <-- application has new revision ready to go and is not successfully upgrading ? unknownRevision : null
             // completion <-- null
             return new State(null, null, null);
         }

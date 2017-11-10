@@ -66,6 +66,7 @@ public class LockedApplication extends Application {
         return new LockedApplication(new Application(id(), deploymentSpec(), validationOverrides(), deployments(),
                                                      deploymentJobs().withTriggering(type,
                                                                                      change,
+                                                                                     // TODO: The below two are irrelevant, as they are always overridden? Very misleading to not just dummy them, if that's true.
                                                                                      determineTriggerVersion(type, controller),
                                                                                      determineTriggerRevision(type, controller),
                                                                                      reason,
