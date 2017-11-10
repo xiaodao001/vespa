@@ -530,9 +530,7 @@ public class DeploymentTrigger {
 
             }
             // Finally, find the exit state of this step, to propagate further:
-            state = stepJobs.stream()
-                    .map(jobType -> State.of(jobStatus.get(jobType)))
-                    .reduce(State::merge)
+            state = JobList.from(application).types(stepJobs).commonState()
                     // A bit convoluted, perhaps; if empty stepJobs, this is a Delay, and we just delay the input state.
                     .orElse(state.delay(((DeploymentSpec.Delay) step).duration(), clock.instant()));
         }

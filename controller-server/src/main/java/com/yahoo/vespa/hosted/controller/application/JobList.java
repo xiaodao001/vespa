@@ -5,8 +5,10 @@ import com.yahoo.component.Version;
 import com.yahoo.vespa.hosted.controller.Application;
 import com.yahoo.vespa.hosted.controller.application.DeploymentJobs.JobType;
 import com.yahoo.vespa.hosted.controller.application.JobStatus.JobRun;
+import com.yahoo.vespa.hosted.controller.deployment.DeploymentTrigger.State;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -55,6 +57,12 @@ public class JobList {
         return ImmutableList.copyOf(list.stream().map(mapper)::iterator);
     }
 
+    public Optional<State> commonState() { return list.stream().map(State::of).reduce(State::merge); }
+
+    public Optional<ApplicationRevision> commonRevision() { return list.stream().map(State::of).map(State::withoutVersion).reduce(State::merge).flatMap(State::revision); }
+
+    public Optional<Version> commonVersion() { return list.stream().map(State::of).map(State::withoutRevision).reduce(State::merge).flatMap(State::version); }
+
     public boolean isEmpty() { return list.isEmpty(); }
 
     public boolean anyMatch() { return ! isEmpty(); }
@@ -99,6 +107,11 @@ public class JobList {
     /** Returns the subset of jobs of the given type -- most useful when negated */
     public JobList type(JobType type) {
         return filter(job -> job.type() == type);
+    }
+
+    /** Returns the subset of jobs of the given type -- most useful when negated */
+    public JobList types(Collection<JobType> types) {
+        return filter(job -> types.contains(job.type()));
     }
 
     /** Returns the subset of jobs of which are production jobs */
