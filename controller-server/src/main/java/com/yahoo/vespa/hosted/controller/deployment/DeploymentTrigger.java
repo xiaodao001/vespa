@@ -517,6 +517,7 @@ public class DeploymentTrigger {
                 State target = state;
                 if ( ! application.deploymentSpec().canChangeRevisionAt(clock.instant())) target = target.withoutRevision();
                 if ( ! application.deploymentSpec().canUpgradeAt(clock.instant())) target = target.withoutVersion();
+                // Also peel away versions that are no longer desired: no longer the deploying(), or, perhaps, no longer have high enough confidence?
                 if (target.isInvalid()) continue; // If all possible changes were prohibited, do nothing.
 
                 Optional<String> reason = reasonForTriggering(jobStatus.get(jobType));
