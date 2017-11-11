@@ -510,9 +510,10 @@ public class DeploymentTrigger {
         for (DeploymentSpec.Step step : application.deploymentSpec().steps()) {
             // For the jobs of this step, trigger what should be triggered based on the state of the previous step:
             List<JobType> stepJobs = step.zones().stream().map(this::jobFor).collect(Collectors.toList());
-            Map<JobType, JobStatus> jobStatus = application.deploymentJobs().jobStatus();
+            application.deploymentJobs().jobStatus();
             for (JobType jobType : stepJobs) {
-                if (state.isSimilarTo(State.of(jobStatus.get(jobType)))) continue; // If the two states are the same, do nothing.
+                JobStatus jobStatus = application.deploymentJobs().jobStatus().get(jobType);
+                if (state.isSimilarTo(State.of(jobStatus))) continue; // If the two states are the same, do nothing.
 
                 State target = state;
                 if ( ! application.deploymentSpec().canChangeRevisionAt(clock.instant())) target = target.withoutRevision();
@@ -520,7 +521,7 @@ public class DeploymentTrigger {
                 // Also peel away versions that are no longer desired: no longer the deploying(), or, perhaps, no longer have high enough confidence?
                 if (target.isInvalid()) continue; // If all possible changes were prohibited, do nothing.
 
-                Optional<String> reason = reasonForTriggering(jobStatus.get(jobType));
+                Optional<String> reason = reasonForTriggering(jobStatus);
                 if ( ! reason.isPresent()) continue; // If we had no reason to trigger this job now: don't!
 
                 if ( ! canTriggerNow(jobType, target, application, stepJobs)) continue; // Go somewhere else to force.
